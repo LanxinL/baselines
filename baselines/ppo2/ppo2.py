@@ -188,6 +188,12 @@ def learn(*, network, env, total_timesteps, eval_env = None, seed=None, nsteps=2
 
         if update_fn is not None:
             update_fn(update)
+        
+        if os.path.exists(os.getenv("LOCK_FILE")):                  
+            os.remove(os.getenv("LOCK_FILE"))                       
+            logger.log("===== unlock ====")                         
+        else:                                                       
+            logger.log("===== no lock file, please check sh ====")  
 
         if update % log_interval == 0 or update == 1:
             # Calculates if value function is a good predicator of the returns (ev > 1)

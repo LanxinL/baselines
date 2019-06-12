@@ -5,15 +5,29 @@
 .pytest_cache
 .DS_Store
 .idea
-
+*.csv
+*.lab-211
+log.txt
 # Setuptools distribution and build folders.
 /dist/
 /build
 keys/
 
+/result
+result/
+/result/
 # Virtualenv
 /env
 
+/__pycache__/
+__pycache__/
+__pycache__
+*.py[cod]
+*/__pycache__
+baselines/ppo2/__pycache_/_
+*__pycache__*
+*log
+__pycache__
 
 *.sublime-project
 *.sublime-workspace

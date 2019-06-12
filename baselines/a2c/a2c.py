@@ -15,6 +15,12 @@ from baselines.ppo2.ppo2 import safemean
 from collections import deque
 
 from tensorflow import losses
+import os
+import os.path as osp
+try:                                        
+    from mpi4py import MPI                  
+except ImportError:                         
+    MPI = None                              
 
 class Model(object):
 
@@ -132,6 +138,7 @@ def learn(
     gamma=0.99,
     log_interval=100,
     load_path=None,
+    save_interval=0,
     **network_kwargs):
 
     '''
@@ -202,6 +209,12 @@ def learn(
     # Calculate the batch_size
     nbatch = nenvs*nsteps
 
+    if os.path.exists(os.getenv("LOCK_FILE")):                
+        os.remove(os.getenv("LOCK_FILE"))                     
+        logger.log("===== unlock ====")                       
+    else:                                                     
+        logger.log("===== no lock file, please check sh ====")
+    
     # Start total timer
     tstart = time.time()
 
@@ -228,5 +241,11 @@ def learn(
             logger.record_tabular("eprewmean", safemean([epinfo['r'] for epinfo in epinfobuf]))
             logger.record_tabular("eplenmean", safemean([epinfo['l'] for epinfo in epinfobuf]))
             logger.dump_tabular()
+        if save_interval and (update % save_interval == 0 or update == 1) and logger.get_dir() and (MPI is None or MPI.COMM_WORLD.Get_rank() == 0):
+            checkdir = osp.join(logger.get_dir(), 'checkpoints')     
+            os.makedirs(checkdir, exist_ok=True)                     
+            savepath = osp.join(checkdir, '%.5i'%update)             
+            print('Saving to', savepath)                             
+            model.save(savepath)       
     return model
 

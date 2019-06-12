@@ -1,5 +1,8 @@
 from . import VecEnvWrapper
+from baselines.common.running_mean_std import RunningMeanStd
 import numpy as np
+import os
+from baselines import logger
 
 class VecNormalize(VecEnvWrapper):
     """
@@ -22,6 +25,8 @@ class VecNormalize(VecEnvWrapper):
         self.ret = np.zeros(self.num_envs)
         self.gamma = gamma
         self.epsilon = epsilon
+        self.useReset0 = False if os.getenv("useReset0")=="None" or os.getenv("useReset0") is None  else eval(os.getenv('useReset0').capitalize())
+        logger.log(" useReset0 is %s"%str(self.useReset0))
 
     def step_wait(self):
         obs, rews, news, infos = self.venv.step_wait()
@@ -30,7 +35,9 @@ class VecNormalize(VecEnvWrapper):
         if self.ret_rms:
             self.ret_rms.update(self.ret)
             rews = np.clip(rews / np.sqrt(self.ret_rms.var + self.epsilon), -self.cliprew, self.cliprew)
-        self.ret[news] = 0.
+        if self.useReset0: 
+            # import pdb; pdb.set_trace()
+            self.ret[news] = 0.
         return obs, rews, news, infos
 
     def _obfilt(self, obs):
@@ -42,6 +49,8 @@ class VecNormalize(VecEnvWrapper):
             return obs
 
     def reset(self):
-        self.ret = np.zeros(self.num_envs)
+        if self.useReset0: 
+            # import pdb; pdb.set_trace()
+            self.ret = np.zeros(self.num_envs)
         obs = self.venv.reset()
         return self._obfilt(obs)

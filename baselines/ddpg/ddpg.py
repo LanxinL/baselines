@@ -115,7 +115,11 @@ def learn(network, env,
 
     epoch = 0
 
-
+    if os.path.exists(os.getenv("LOCK_FILE")):                  
+        os.remove(os.getenv("LOCK_FILE"))                       
+        logger.log("===== unlock ====")                         
+    else:                                                       
+        logger.log("===== no lock file, please check sh ====")  
 
     start_time = time.time()
 
