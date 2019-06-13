@@ -18,6 +18,8 @@ try:
 except ImportError:
     MPI = None
 
+from collections import deque
+
 def learn(network, env,
           seed=None,
           total_timesteps=None,
@@ -123,12 +125,14 @@ def learn(network, env,
 
     start_time = time.time()
 
-    epoch_episode_rewards = []
-    epoch_episode_steps = []
     epoch_actions = []
     epoch_qs = []
     epoch_episodes = 0
+    epinfobuf = deque(maxlen=100)
+    if eval_env is not None:
+        eval_epinfobuf = deque(maxlen=100)
     for epoch in range(nb_epochs):
+        epinfos, eval_epinfos = [],[]
         for cycle in range(nb_epoch_cycles):
             # Perform rollouts.
             if nenvs > 1:
@@ -144,14 +148,16 @@ def learn(network, env,
                     env.render()
 
                 # max_action is of dimension A, whereas action is dimension (nenvs, A) - the multiplication gets broadcasted to the batch
-                new_obs, r, done, info = env.step(max_action * action)  # scale for execution in env (as far as DDPG is concerned, every action is in [-1, 1])
+                new_obs, r, done, infos = env.step(max_action * action)  # scale for execution in env (as far as DDPG is concerned, every action is in [-1, 1])
                 # note these outputs are batched from vecenv
+
+                for info in infos:
+                    maybeepinfo = info.get('episode')
+                    if maybeepinfo: epinfos.append(maybeepinfo)
 
                 t += 1
                 if rank == 0 and render:
                     env.render()
-                episode_reward += r
-                episode_step += 1
 
                 # Book-keeping.
                 epoch_actions.append(action)
@@ -159,20 +165,6 @@ def learn(network, env,
                 agent.store_transition(obs, action, r, new_obs, done) #the batched data will be unrolled in memory.py's append.
 
                 obs = new_obs
-
-                for d in range(len(done)):
-                    if done[d]:
-                        # Episode done.
-                        epoch_episode_rewards.append(episode_reward[d])
-                        episode_rewards_history.append(episode_reward[d])
-                        epoch_episode_steps.append(episode_step[d])
-                        episode_reward[d] = 0.
-                        episode_step[d] = 0
-                        epoch_episodes += 1
-                        episodes += 1
-                        if nenvs == 1:
-                            agent.reset()
-
 
 
             # Train.
@@ -198,7 +190,12 @@ def learn(network, env,
                 eval_episode_reward = np.zeros(nenvs_eval, dtype = np.float32)
                 for t_rollout in range(nb_eval_steps):
                     eval_action, eval_q, _, _ = agent.step(eval_obs, apply_noise=False, compute_Q=True)
-                    eval_obs, eval_r, eval_done, eval_info = eval_env.step(max_action * eval_action)  # scale for execution in env (as far as DDPG is concerned, every action is in [-1, 1])
+                    eval_obs, eval_r, eval_done, eval_infos = eval_env.step(max_action * eval_action)  # scale for execution in env (as far as DDPG is concerned, every action is in [-1, 1])
+
+                    for eval_info in eval_info:
+                        maybeepinfo = eval_info.get('episode')
+                        if maybeepinfo: eval_epinfos.append(maybeepinfo)
+
                     if render_eval:
                         eval_env.render()
                     eval_episode_reward += eval_r
@@ -210,6 +207,10 @@ def learn(network, env,
                             eval_episode_rewards_history.append(eval_episode_reward[d])
                             eval_episode_reward[d] = 0.0
 
+        epinfobuf.extend(epinfos)
+        if eval_env is not None:
+            eval_epinfobuf.extend(eval_epinfos)
+
         if MPI is not None:
             mpi_size = MPI.COMM_WORLD.Get_size()
         else:
@@ -220,11 +221,8 @@ def learn(network, env,
         duration = time.time() - start_time
         stats = agent.get_stats()
         combined_stats = stats.copy()
-        combined_stats['rollout/return'] = np.mean(epoch_episode_rewards)
-        combined_stats['rollout/return_std'] = np.std(epoch_episode_rewards)
-        combined_stats['rollout/return_history'] = np.mean(episode_rewards_history)
-        combined_stats['rollout/return_history_std'] = np.std(episode_rewards_history)
-        combined_stats['rollout/episode_steps'] = np.mean(epoch_episode_steps)
+        combined_stats['rollout/return'] = safemean([epinfo['r'] for epinfo in epinfobuf])
+        combined_stats['rollout/episode_steps'] =  safemean([epinfo['l'] for epinfo in epinfobuf])
         combined_stats['rollout/actions_mean'] = np.mean(epoch_actions)
         combined_stats['rollout/Q_mean'] = np.mean(epoch_qs)
         combined_stats['train/loss_actor'] = np.mean(epoch_actor_losses)
@@ -237,10 +235,8 @@ def learn(network, env,
         combined_stats['rollout/actions_std'] = np.std(epoch_actions)
         # Evaluation statistics.
         if eval_env is not None:
-            combined_stats['eval/return'] = eval_episode_rewards
-            combined_stats['eval/return_history'] = np.mean(eval_episode_rewards_history)
+            combined_stats['eval/return'] = safemean([epinfo['r'] for epinfo in eval_epinfobuf])
             combined_stats['eval/Q'] = eval_qs
-            combined_stats['eval/episodes'] = len(eval_episode_rewards)
         def as_scalar(x):
             if isinstance(x, np.ndarray):
                 assert x.size == 1
@@ -277,3 +273,6 @@ def learn(network, env,
 
 
     return agent
+
+def safemean(xs):
+    return np.nan if len(xs) == 0 else np.mean(xs)
