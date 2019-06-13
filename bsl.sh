@@ -6,8 +6,8 @@ export CUDA_HOME=$CUDA_HOME:/usr/local/cuda-9.0
 
 eName=ganRl
 seeds_num=10
-alg=ddpg
-#alg=ppo2
+#alg=ddpg
+alg=ppo2
 #alg=a2c
 #nsteps=2048
 
@@ -128,19 +128,19 @@ for num_env in $num_envs;do
 
     export useReset0=$useReset0
 
-    {
+    #{
         PIDS[$Cproc]=$!; 
         echo_running_start
 
         save_path="ppoParMujoco/0/alg_"$alg"_e_"$num_timesteps"_useReset0_"$useReset0"_num_env_"$num_env"_nsteps_"$nsteps
             
-        #save_path='test/'
+        save_path='test/'
         
         CUDA_VISIBLE_DEVICES=$(( $Cproc % 8)) python -m baselines.run --alg=$alg --env=$env --network=mlp --num_timesteps=$num_timesteps --num_env=$num_env --seed=$seed  --log_path ./result/$alg/$save_path/$env/$seed/  #--save_interval $save_interval #--nsteps $nsteps #--ent_coef 0.002
         
         echo_running_over
         echo 1>&777 
-    }&                  
+    #}&                  
 done;done;done;done;done
 
 trap "rm -f ${LOCK_FILE};kill ${PIDS[*]}" SIGINT
