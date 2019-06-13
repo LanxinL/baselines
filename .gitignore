@@ -1,3 +1,4 @@
+*.log
 *.swp
 *.pyc
 *.pkl
@@ -5,12 +6,17 @@
 .pytest_cache
 .DS_Store
 .idea
-
+*.csv
+*.lab-211
+log.txt
 # Setuptools distribution and build folders.
 /dist/
 /build
 keys/
 
+/result
+result/
+/result/
 # Virtualenv
 /env
 
