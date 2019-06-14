@@ -1,5 +1,6 @@
 import numpy as np
 from baselines.common.runners import AbstractEnvRunner
+from collections import deque
 
 class Runner(AbstractEnvRunner):
     """
@@ -16,6 +17,7 @@ class Runner(AbstractEnvRunner):
         self.lam = lam
         # Discount rate
         self.gamma = gamma
+        self.reward_history = {}
 
     def run(self):
         # Here, we init the lists that will contain the mb of experiences
@@ -36,9 +38,13 @@ class Runner(AbstractEnvRunner):
             # Take actions in env and look the results
             # Infos contains a ton of useful informations
             self.obs[:], rewards, self.dones, infos = self.env.step(actions)
-            for info in infos:
+            for i,info in enumerate(infos):
                 maybeepinfo = info.get('episode')
-                if maybeepinfo: epinfos.append(maybeepinfo)
+                if maybeepinfo: 
+                    epinfos.append(maybeepinfo)
+                    if i not in self.reward_history.keys():
+                        self.reward_history[i] = deque(maxlen=100)
+                    self.reward_history[i].extend([maybeepinfo['r']])
             mb_rewards.append(rewards)
         #batch of steps to batch of rollouts
         mb_obs = np.asarray(mb_obs, dtype=self.obs.dtype)
