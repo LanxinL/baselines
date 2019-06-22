@@ -20,8 +20,8 @@ alg=ppo2
 envs="InvertedDoublePendulum-v2 Swimmer-v2 Humanoid-v2" 
 #envs="Humanoid-v2 Ant-v2" 
 
-#seeds='3'
-seeds='0 1 2 3 4' # 5 6 7 8 9
+seeds='1'
+#seeds='0 1 2 3 4' # 5 6 7 8 9
 #seeds='20 21 22 23 24 25 26 27 28 29'
 #seeds='10 11 12 13 14 15 16 17 18 19'
 useReset0s='False' # True
